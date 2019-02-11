@@ -20,6 +20,7 @@
         <language>en el</language>
         <website/>
         <email>threshold84@protonmail.com</email>
+        <source>https://github.com/threshold84/repo.threshold84/tree/master/plugin.video.diasporatv</source>
         <assets>
             <icon>icon.png</icon>
             <fanart>fanart.jpg</fanart>
