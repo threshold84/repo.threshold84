@@ -1,0 +1,26 @@
+# Addon Name: Ellinon Sinelefsis
+# Addon id: plugin.video.ellinonsinelefis
+# Addon Provider: Threshold84
+
+msgid ""
+msgstr ""
+
+msgctxt "#30001"
+msgid "Live video stream"
+msgstr ""
+
+msgctxt "#30002"
+msgid "Live radio stream"
+msgstr ""
+
+msgctxt "#30003"
+msgid "Youtube channel"
+msgstr ""
+
+msgctxt "#30004"
+msgid "External links"
+msgstr ""
+
+msgctxt "#30005"
+msgid "Ellinon Sinelefsis website"
+msgstr ""

@@ -1,0 +1,2 @@
+This icon is provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+https://www.iconsdb.com
