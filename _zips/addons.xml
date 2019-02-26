@@ -1,19 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
-    <addon id="repository.threshold84" name="Threshold84 Addon Repository" version="1.0.0" provider-name="Threshold84">
-        <extension point="xbmc.addon.repository" name="Threshold84 Addon Repository">
-            <info compressed="false">http://raw.githubusercontent.com/Threshold84/repo.threshold84/_zips/addons.xml</info>
-            <checksum>http://raw.githubusercontent.com/Threshold84/repo.threshold84/_zips/addons.xml.md5</checksum>
-            <datadir zip="true">http://raw.githubusercontent.com/Threshold84/repo.threshold84/_zips/</datadir>
-            <hashes>false</hashes>
-        </extension>
-        <extension point="xbmc.addon.metadata">
-            <summary>Repository for various add-ons</summary>
-            <description></description>
-            <platform>all</platform>
-    </extension>
-</addon>
-
 <addon id="plugin.video.diasporatv" name="Diaspora TV" version="1.0.0" provider-name="Threshold84">
     <requires>
         <import addon="xbmc.python" version="2.24.0"/>
@@ -47,5 +33,10 @@
     </extension>
     <news>[B]1.0.0[/B] - 12-02-2019[/B]
 - Initial Version</news>
+    <extension name="Diaspora Repository" point="xbmc.addon.repository">
+       <info compressed="false">https://github.com/threshold84/repo.threshold84/blob/master/_zips/addons.xml</info>
+       <checksum>https://github.com/threshold84/repo.threshold84/blob/master/_zips/addons.xml.md5</checksum>
+       <datadir zip="true">https://github.com/threshold84/repo.threshold84/blob/master/_zips/</datadir>
+    </extension>
 </addon>
 </addons>

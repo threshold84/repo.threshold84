@@ -32,4 +32,9 @@
     </extension>
     <news>[B]1.0.0[/B] - 12-02-2019[/B]
 - Initial Version</news>
+    <extension name="Diaspora Repository" point="xbmc.addon.repository">
+       <info compressed="false">https://github.com/threshold84/repo.threshold84/blob/master/_zips/addons.xml</info>
+       <checksum>https://github.com/threshold84/repo.threshold84/blob/master/_zips/addons.xml.md5</checksum>
+       <datadir zip="true">https://github.com/threshold84/repo.threshold84/blob/master/_zips/</datadir>
+    </extension>
 </addon>
