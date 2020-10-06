@@ -1,0 +1,9 @@
+<settings>
+
+    <category label="30002">
+
+        <setting id="filter" label="30003" type="text" default="sport" visible="true"/>
+
+    </category>
+
+</settings>

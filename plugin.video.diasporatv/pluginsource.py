@@ -30,7 +30,7 @@ channel_id = 'UCzmavZuisZ4a1DvHu8-6UwQ'
 # https://www.youtube.com/channel/UCmeBnLE1wIeRsflFQQjmLnw/
 
 from os.path import join
-from resources.lib.simpleplugin import Plugin, Addon
+from simpleplugin import Plugin, Addon
 from resources.lib import operations
 
 

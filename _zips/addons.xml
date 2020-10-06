@@ -1,25 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
-    <addon id="repository.threshold84" name="Threshold84 Addon Repository" version="1.0.0" provider-name="Threshold84">
-        <extension point="xbmc.addon.repository" name="Threshold84 Addon Repository">
-            <info compressed="false">http://raw.githubusercontent.com/Threshold84/repo.threshold84/_zips/addons.xml</info>
-            <checksum>http://raw.githubusercontent.com/Threshold84/repo.threshold84/_zips/addons.xml.md5</checksum>
-            <datadir zip="true">http://raw.githubusercontent.com/Threshold84/repo.threshold84/_zips/</datadir>
-            <hashes>false</hashes>
-        </extension>
-        <extension point="xbmc.addon.metadata">
-            <summary>Repository for various add-ons</summary>
-            <description></description>
-            <platform>all</platform>
-    </extension>
-</addon>
-
-<addon id="plugin.video.diasporatv" name="Diaspora TV" version="1.0.0" provider-name="Threshold84">
+<addon id="plugin.video.diasporatv" name="Diaspora TV" version="1.1.0" provider-name="Threshold84">
     <requires>
         <import addon="xbmc.python" version="2.24.0"/>
         <import addon="script.module.six" version="1.11.0"/>
         <import addon="script.module.kodi-six" version="0.0.2"/>
-        <import addon="plugin.video.youtube" version="6.3.1"/>
+        <import addon="plugin.video.youtube" version="6.8.4"/>
+        <import addon="script.module.simpleplugin3" version="3.0.2"/>
     </requires>
     <extension point="xbmc.python.pluginsource" library="pluginsource.py">
         <provides>video</provides>
@@ -45,7 +32,111 @@
             <!--<screenshot>resources/screenshot-04.jpg</screenshot>-->
         </assets>
     </extension>
-    <news>[B]1.0.0[/B] - 12-02-2019[/B]
+    <news>[B]1.1.0[/B] - 06-10-2020[/B]
+- Replaced internal simpleplugin with simpleplugin3 from upstream
+- Updated youtube API keys and its function
+
+[B]1.0.0[/B] - 12-02-2019[/B]
 - Initial Version</news>
+</addon>
+
+<addon id="plugin.video.n0v4" name="N0v4" version="2" provider-name="N0v4">
+  <requires>
+    <import addon="xbmc.python" version="2.26.0"/>
+    <import addon="script.module.tulip" version="2.6.17"/>
+    <import addon="script.module.futures" version="2.2.0"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="addon.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <reuselanguageinvoker>false</reuselanguageinvoker>
+    <summary lang="en_GB">N0v4</summary>
+    <description lang="en_GB">N0v4</description>
+  </extension>
+</addon>
+
+<addon id="plugin.video.tvone11" name="tvOne11" version="23" provider-name="RACC">
+  <requires>
+    <import addon="xbmc.python" version="2.26.0"/>
+    <import addon="script.module.requests" />
+    <import addon="script.module.kodi-six" />
+    <import addon="script.module.future" />
+    <import addon="script.module.routing" />
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="addon.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <reuselanguageinvoker>true</reuselanguageinvoker>
+    <summary lang="en_gb">tvOne11</summary>
+    <description lang="en_gb">tvOne11</description>
+    <disclaimer lang="en_gb"></disclaimer>
+    <language></language>
+    <platform>all</platform>
+    <license>GPL-3.0</license>
+    <forum></forum>
+    <website></website>
+    <email></email>
+    <source></source>
+    <assets></assets>
+  </extension>
+</addon>
+
+    <addon id="repository.threshold84" name="Threshold84 Addon Repository" version="1.1.0" provider-name="Threshold84">
+        <extension point="xbmc.addon.repository" name="Threshold84 Addon Repository">
+            <info compressed="false">https://raw.githubusercontent.com/Threshold84/repo.threshold84/master/_zips/addons.xml</info>
+            <checksum>https://raw.githubusercontent.com/Threshold84/repo.threshold84/master/_zips/addons.xml.md5</checksum>
+            <datadir zip="true">https://raw.githubusercontent.com/Threshold84/repo.threshold84/master/_zips/</datadir>
+            <hashes>false</hashes>
+            <dir minversion="14.0.0">
+                <info>https://vlmaksime.github.io/repository.vlmaksime/repo/helix/addons.xml</info>
+                <checksum>https://vlmaksime.github.io/repository.vlmaksime/repo/helix/addons.xml.md5</checksum>
+                <datadir zip="true">https://vlmaksime.github.io/repository.vlmaksime/repo/helix/</datadir>
+            </dir>
+            <dir minversion="14.0.0">
+                <info>https://vlmaksime.github.io/repository.vlmaksime/repo/helix/repository.xml</info>
+                <checksum>https://vlmaksime.github.io/repository.vlmaksime/repo/helix/repository.xml.md5</checksum>
+                <datadir zip="true">https://vlmaksime.github.io/repository.vlmaksime/repo/helix/</datadir>
+            </dir>
+            <dir minversion="18.9.0">
+                <info>https://vlmaksime.github.io/repository.vlmaksime/repo/matrix/repository.xml</info>
+                <checksum>https://vlmaksime.github.io/repository.vlmaksime/repo/matrix/repository.xml.md5</checksum>
+                <datadir zip="true">https://vlmaksime.github.io/repository.vlmaksime/repo/matrix/</datadir>
+            </dir>
+        </extension>
+        <extension point="xbmc.addon.metadata">
+            <summary>Repository for various add-ons</summary>
+            <description></description>
+            <platform>all</platform>
+    </extension>
+</addon>
+
+<addon id="repository.vlmaksime" name="vl.maksime Add-on repository" version="2.1.14" provider-name="vl.maksime">
+    <extension point="xbmc.addon.repository" name="vl.maksime Add-on repository">
+        <dir minversion="14.0.0">
+            <info>https://vlmaksime.github.io/repository.vlmaksime/repo/helix/addons.xml</info>
+            <checksum>https://vlmaksime.github.io/repository.vlmaksime/repo/helix/addons.xml.md5</checksum>
+            <datadir zip="true">https://vlmaksime.github.io/repository.vlmaksime/repo/helix/</datadir>
+        </dir>
+        <dir minversion="14.0.0">
+            <info>https://vlmaksime.github.io/repository.vlmaksime/repo/helix/repository.xml</info>
+            <checksum>https://vlmaksime.github.io/repository.vlmaksime/repo/helix/repository.xml.md5</checksum>
+            <datadir zip="true">https://vlmaksime.github.io/repository.vlmaksime/repo/helix/</datadir>
+        </dir>
+        <dir minversion="18.9.0">
+            <info>https://vlmaksime.github.io/repository.vlmaksime/repo/matrix/repository.xml</info>
+            <checksum>https://vlmaksime.github.io/repository.vlmaksime/repo/matrix/repository.xml.md5</checksum>
+            <datadir zip="true">https://vlmaksime.github.io/repository.vlmaksime/repo/matrix/</datadir>
+        </dir>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en">Install Add-ons from vl.maksime</summary>
+        <summary lang="ru">Установить дополнения от vl.maksime</summary>
+        <description lang="en">Download and install add-ons from the vl.maksime add-on repository.</description>
+        <description lang="ru">Загружайте и устанавливайте обновления из репозитория vl.maksime.</description>
+        <platform>all</platform>
+        <news>v2.1.14 (2020-03-30)[CR]- Реализована отдельная ветка для Kodi 14-Kodi 18</news>
+    </extension>
 </addon>
 </addons>
