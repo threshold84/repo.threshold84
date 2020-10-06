@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.diasporatv" name="Diaspora TV" version="1.0.0" provider-name="Threshold84">
+<addon id="plugin.video.diasporatv" name="Diaspora TV" version="1.2.0" provider-name="Threshold84">
     <requires>
         <import addon="xbmc.python" version="2.24.0"/>
         <import addon="script.module.six" version="1.11.0"/>
         <import addon="script.module.kodi-six" version="0.0.2"/>
-        <import addon="plugin.video.youtube" version="6.3.1"/>
+        <import addon="plugin.video.youtube" version="6.8.4"/>
+        <import addon="script.module.tulip" version="2.7.1"/>
     </requires>
-    <extension point="xbmc.python.pluginsource" library="pluginsource.py">
+    <extension point="xbmc.python.pluginsource" library="default.py">
         <provides>video</provides>
     </extension>
     <extension point="xbmc.addon.metadata">
@@ -30,11 +31,20 @@
             <!--<screenshot>resources/screenshot-04.jpg</screenshot>-->
         </assets>
     </extension>
-    <news>[B]1.0.0[/B] - 12-02-2019[/B]
+    <news>[B]1.2.0[/B] - 06-10-2020[/B]
+- Replaced internal simpleplugin with tulip from upstream
+- Updated youtube API keys and its function
+
+[B]1.0.0[/B] - 12-02-2019[/B]
 - Initial Version</news>
     <extension name="Diaspora Repository" point="xbmc.addon.repository">
        <info compressed="false">https://github.com/threshold84/repo.threshold84/blob/master/_zips/addons.xml</info>
        <checksum>https://github.com/threshold84/repo.threshold84/blob/master/_zips/addons.xml.md5</checksum>
        <datadir zip="true">https://github.com/threshold84/repo.threshold84/blob/master/_zips/</datadir>
+       <dir>
+           <info compressed="false">https://raw.githubusercontent.com/Twilight0/repo.twilight0.libs/master/_zips/addons.xml</info>
+           <checksum>https://raw.githubusercontent.com/Twilight0/repo.twilight0.libs/master/_zips/addons.xml.md5</checksum>
+           <datadir zip="true">https://raw.githubusercontent.com/Twilight0/repo.twilight0.libs/master/_zips/</datadir>
+       </dir>
     </extension>
 </addon>

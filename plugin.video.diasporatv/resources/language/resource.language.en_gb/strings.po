@@ -1,5 +1,5 @@
-# Addon Name: Ellinon Sinelefsis
-# Addon id: plugin.video.ellinonsinelefis
+# Addon Name: Diaspora TV
+# Addon id: plugin.video.diasporatv
 # Addon Provider: Threshold84
 
 msgid ""

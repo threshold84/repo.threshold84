@@ -18,23 +18,48 @@
         along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from kodi_six import xbmc
-from simpleplugin import Addon
+import json
+from base64 import b64decode
+from zlib import decompress
+from os.path import join, exists as file_exists
 from youtube_registration import register_api_keys
 
-yt_keys = {
-    'id': '498788153161-pe356urhr0uu2m98od6f72k0vvcdsij0.apps.googleusercontent.com',
-    'api_key': 'AIzaSyA8k1OyLGf03HBNl0byD511jr9cFWo2GR4',
-    'secret': 'e6RBIFCVh1Fm-IX87PVJjgUu'
-}
+from tulip.url_dispatcher import urldispatcher
+from tulip import directory, control
+from tulip.log import log_debug
 
-addon = Addon()
+scramble = (
+    'eJwVy80KgjAAAOBXkZ1LprNy3UqTQsoww25i25riz9RthkXvHt6/7wskIwNTYGuA6Ei5HnSlaEGKS+gdYLPfpH0MFgbIuzKr2DSz3emT3ya/eHj9M7'
+    'sHNHG9MbkGdRzeZOoHTfTGfdKd51XSOVgQovUKYeza0FmWDkYN1ZwqS44jf3G7thiVTiFtUiGXm3nXSZMLwWumJRuIaBVrlUlEA35/OLI5KA=='
+)
 
 
 def enter_youtube():
 
-    register_api_keys('plugin.video.ellinonsinelefis', yt_keys['api_key'], yt_keys['id'], yt_keys['secret'])
-    addon.log('Successfully registered youtube keys')
+    filepath = control.transPath(join(control.addon('plugin.video.youtube').getAddonInfo('profile'), 'api_keys.json'))
+
+    setting = control.addon('plugin.video.youtube').getSetting('youtube.allow.dev.keys') == 'true'
+
+    if file_exists(filepath):
+
+        f = open(filepath)
+
+        jsonstore = json.load(f)
+
+        no_keys = 'plugin.video.diasporatv' not in jsonstore.get('keys', 'developer').get('developer')
+
+        if setting and no_keys:
+
+            yt_keys = json.loads(decompress(b64decode(scramble)))
+
+            register_api_keys('plugin.video.diasporatv', yt_keys['api_key'], yt_keys['id'], yt_keys['secret'])
+            log_debug('Successfully registered youtube keys')
+
+        else:
+
+            log_debug('Youtube keys have already been registered')
+
+        f.close()
 
 
 def android_activity(url, package=''):
@@ -45,9 +70,10 @@ def android_activity(url, package=''):
     return xbmc.executebuiltin('StartAndroidActivity({0},"android.intent.action.VIEW","","{1}")'.format(package, url))
 
 
+@urldispatcher.register('external', ['url'])
 def open_web_browser(url):
 
-    if xbmc.getCondVisibility('system.platform.android'):
+    if control.condVisibility('system.platform.android'):
 
         return android_activity(url)
 
@@ -56,3 +82,15 @@ def open_web_browser(url):
         import webbrowser
 
         return webbrowser.open(url)
+
+
+@urldispatcher.register('play', ['url'])
+def play(url):
+
+    directory.resolve(url)
+
+
+@urldispatcher.register('youtube', ['url'])
+def yt(url):
+
+    control.execute('Container.Update({},return)'.format(url))
