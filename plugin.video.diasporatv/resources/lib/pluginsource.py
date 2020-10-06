@@ -29,73 +29,47 @@ channel_id = 'UCzmavZuisZ4a1DvHu8-6UwQ'
 # https://www.youtube.com/channel/UCzmavZuisZ4a1DvHu8-6UwQ/
 # https://www.youtube.com/channel/UCmeBnLE1wIeRsflFQQjmLnw/
 
-from os.path import join
+from tulip import control, directory
+from tulip.url_dispatcher import urldispatcher
 
 
+@urldispatcher.register('root')
 def root():
 
     menu = [
         {
-            'label': addon.get_localized_string(30001),
-            'info': {'video': {'title': 'Diaspora TV'}},
-            'url': plugin.get_url(action='play', url=video_url),
-            'thumb': join(addon.path, 'icon.png'),
-            'fanart': join(addon.path, 'fanart.jpg'),
-            'is_playable': True,
-            'stream_info': {'video': {'codec': 'h264'}},
-            'is_folder': False
+            'label': control.lang(30001),
+            'title': 'Diaspora TV',
+            'url': video_url,
+            'action': 'play',
+            'isFolder': 'False'
         }
         ,
         {
-            'label': addon.get_localized_string(30002),
-            'info': {'audio': {'title': 'Diaspora Radio'}},
-            'url': plugin.get_url(action='play', url=radio_url),
-            'thumb': join(addon.path, 'resources', 'media', 'radio_stream.jpg'),
-            'fanart': join(addon.path, 'resources', 'media', 'radio_fanart.jpg'),
-            'is_playable': True,
-            'stream_info': {'audio': {'codec': 'mp3'}},
-            'is_folder': False
+            'label': control.lang(30002),
+            'title': 'Diaspora Radio',
+            'url': radio_url,
+            'action': 'play',
+            'isFolder': 'False',
+            'icon': 'radio_stream.jpg',
+            'fanart': control.join(control.addonInfo('path'), 'resources', 'media', 'radio_fanart.jpg')
         }
         ,
         {
-            'label': addon.get_localized_string(30003),
-            'url': plugin.get_url(plugin_url='plugin://plugin.video.youtube/channel/UCzmavZuisZ4a1DvHu8-6UwQ/?addon_id=plugin.video.ellinonsinelefis'),
-            'thumb': join(addon.path, 'resources', 'media', 'youtube.jpg'),
-            'fanart': join(addon.path, 'resources', 'media', 'youtube_fanart.jpg'),
-            'is_folder': True,
-            'is_playable': False
+            'title': control.lang(30003),
+            'url': 'plugin://plugin.video.youtube/channel/UCzmavZuisZ4a1DvHu8-6UwQ/?addon_id=plugin.video.diasporatv',
+            'action': 'youtube',
+            'icon': 'youtube.jpg',
+            'fanart': control.join(control.addonInfo('path'), 'resources', 'media', 'youtube_fanart.jpg'),
+            'isFolder': 'False', 'isPlayable': 'False'
         }
         ,
         {
-            'label': addon.get_localized_string(30004),
-            'url': plugin.get_url(action='external'),
-            'thumb': join(addon.path, 'resources', 'media', 'external.jpg'),
-            'is_folder': True
+            'title': control.lang(30004),
+            'action': 'external',
+            'url': 'https://e-sy.gr/',
+            'isFolder': 'False', 'isPlayable': 'False'
         }
     ]
 
-
-
-def play(params):
-
-    yield params.url
-
-
-
-def open_url(params):
-
-    operations.open_web_browser(params.url)
-
-
-
-def external():
-
-    menu = [
-        {
-            'label': addon.get_localized_string(30005),
-            'url': plugin.get_url(action='open_url', url='https://e-sy.gr/'),
-            'thumb': join(addon.path, 'resources', 'media', 'esy_logo.jpg'),
-            'is_folder': False,
-            'is_playable': False
-        }
-    ]
+    directory.add(menu)
