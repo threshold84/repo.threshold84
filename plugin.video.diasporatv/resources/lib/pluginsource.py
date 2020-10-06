@@ -30,18 +30,9 @@ channel_id = 'UCzmavZuisZ4a1DvHu8-6UwQ'
 # https://www.youtube.com/channel/UCmeBnLE1wIeRsflFQQjmLnw/
 
 from os.path import join
-from simpleplugin import Plugin, Addon
-from resources.lib import operations
 
 
-plugin = Plugin()
-addon = Addon()
-
-
-@plugin.action()
 def root():
-
-    operations.enter_youtube()
 
     menu = [
         {
@@ -83,22 +74,20 @@ def root():
         }
     ]
 
-    return menu
 
 
-@plugin.action()
 def play(params):
 
-    return params.url
+    yield params.url
 
 
-@plugin.action()
+
 def open_url(params):
 
     operations.open_web_browser(params.url)
 
 
-@plugin.action()
+
 def external():
 
     menu = [
@@ -110,10 +99,3 @@ def external():
             'is_playable': False
         }
     ]
-
-    return menu
-
-
-if __name__ == '__main__':
-
-    plugin.run()
