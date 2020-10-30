@@ -25,3 +25,19 @@ msgstr ""
 msgctxt "#30003"
 msgid "Filter"
 msgstr ""
+
+msgctxt "#30004"
+msgid "Check streams"
+msgstr ""
+
+msgctxt "#30005"
+msgid "Timeout"
+msgstr ""
+
+msgctxt "#30006"
+msgid "Clear cache"
+msgstr ""
+
+msgctxt "#30007"
+msgid "OK"
+msgstr ""

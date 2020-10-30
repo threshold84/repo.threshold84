@@ -25,3 +25,19 @@ msgstr "Γενικά"
 msgctxt "#30003"
 msgid "Filter"
 msgstr "Φίλτρο"
+
+msgctxt "#30004"
+msgid "Check streams"
+msgstr "Έλεγχος ροών"
+
+msgctxt "#30005"
+msgid "Timeout"
+msgstr "Χρόνος λήξης"
+
+msgctxt "#30006"
+msgid "Clear cache"
+msgstr "Εκκαθάριση μνήμης"
+
+msgctxt "#30007"
+msgid "OK"
+msgstr "OK"

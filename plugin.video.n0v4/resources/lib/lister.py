@@ -29,17 +29,23 @@ def _get_content():
 
         _list.append({'title': title[:-1], 'url': link[:-1]})
 
-    with concurrent.futures.ThreadPoolExecutor(10) as executor:
+    if control.setting('check') == 'true':
 
-        for i in _list:
-            futures.append(executor.submit(_check_url, i))
-        for future in concurrent.futures.as_completed(futures):
-            item = future.result()
-            if not item:
-                continue
-            result.append(item)
+        with concurrent.futures.ThreadPoolExecutor(10) as executor:
 
-    return result
+            for i in _list:
+                futures.append(executor.submit(_check_url, i))
+            for future in concurrent.futures.as_completed(futures):
+                item = future.result()
+                if not item:
+                    continue
+                result.append(item)
+
+        return result
+
+    else:
+
+        return _list
 
 
 @urldispatcher.register('menu')
@@ -50,16 +56,19 @@ def menu():
     if _list is None:
         return
 
-    cache_clear = {'title': 30001, 'query': {'action': 'cache_clear'}}
+    refresh = {'title': 30001, 'query': {'action': 'refresh'}}
 
     for i in _list:
-        i.update({'action': 'play', 'isFolder': 'False', 'cm': [cache_clear]})
+        i.update({'action': 'play', 'isFolder': 'False', 'cm': [refresh]})
 
     control.sortmethods('title')
     control.sortmethods()
 
     if control.setting('filter'):
-        result = [i for i in _list if control.setting('filter').lower() in i['title'].lower()]
+        try:
+            result = [i for i in _list if control.setting('filter').lower() in i['title'].lower().decode('utf-8')]
+        except Exception:
+            result = [i for i in _list if control.setting('filter').lower() in i['title'].lower()]
         directory.add(result)
     else:
         directory.add(_list)
@@ -68,7 +77,7 @@ def menu():
 def _check_url(item):
 
     try:
-        ok = client.request(item['url'], output='response', timeout=10)[0] == u'200'
+        ok = client.request(item['url'], output='response', timeout=int(control.setting('timeout')))[0] == u'200'
     except Exception:
         ok = False
 

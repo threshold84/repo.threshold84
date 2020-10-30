@@ -3,6 +3,9 @@
     <category label="30002">
 
         <setting id="filter" label="30003" type="text" default="sport" visible="true"/>
+        <setting id="check" label="30004" type="bool" default="false" visible="true"/>
+        <setting id="timeout" type="slider" label="30005" default="10" range="10,10,120" option="int" visible="eq(-1,true)"/>
+        <setting visible="true" label="30006" type="action" action="RunPlugin(plugin://$ID/?action=cache_clear)"/>
 
     </category>
 

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.n0v4" name="N0v4" version="2" provider-name="N0v4">
+<addon id="plugin.video.n0v4" name="N0v4" version="3" provider-name="N0v4">
   <requires>
     <import addon="xbmc.python" version="2.26.0"/>
     <import addon="script.module.tulip" version="2.6.17"/>
