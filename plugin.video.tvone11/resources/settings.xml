@@ -1,7 +1,5 @@
 <settings>
     <category label="General">
         <setting label="Use inputstream.adaptive" type="bool" id="inputstream" default="false"/>
-        <setting label="Cache time (Hours)" type="slider" id="cache_time" default="8" range="0,80" option="int"/>
-        <setting label="Data Time" type="text" id="data_time" default="0" visible="false"/>
     </category>
 </settings>

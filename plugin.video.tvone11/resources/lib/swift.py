@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 RACC
+# Copyright (C) 2020 RACC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,13 +33,25 @@ from requests.exceptions import RequestException
 from base64 import b64encode
 from random import randint
 from hashlib import md5
-from future.moves.urllib.parse import urlencode
 from future.moves.http.cookiejar import LWPCookieJar
 from requests.packages.urllib3.util import Retry
 from requests.adapters import HTTPAdapter
 from warnings import simplefilter
 
 simplefilter("ignore")
+""" disable IPv6 """
+import socket
+
+old_getaddrinfo = socket.getaddrinfo
+
+
+def new_getaddrinfo(*args, **kwargs):
+    responses = old_getaddrinfo(*args, **kwargs)
+    return [response for response in responses if response[0] == socket.AF_INET]
+
+
+socket.getaddrinfo = new_getaddrinfo
+
 db = SqliteDatabase(None)
 
 
@@ -51,6 +63,7 @@ class BaseModel(Model):
 class Token(BaseModel):
     t_id = IntegerField(unique=True)
     token_link = TextField()
+    updated = FloatField(default=time.time)
 
 
 class Category(BaseModel):
@@ -58,6 +71,7 @@ class Category(BaseModel):
     c_image = TextField()
     c_name = TextField()
     c_type = TextField()
+    updated = FloatField(default=time.time)
 
 
 class Channel(BaseModel):
@@ -98,13 +112,14 @@ class VodStream(BaseModel):
 
 class SwiftStream:
     def __init__(self, cache_dir):
-        DB = os.path.join(cache_dir, "swift2.db")
+        self.CACHE_TIME = 8 * 60 * 60
+        DB = os.path.join(cache_dir, "swift3.db")
         COOKIE_FILE = os.path.join(cache_dir, "lwp_cookies.dat")
         db.init(DB)
         db.connect()
         db.create_tables([Token, Category, Channel, Stream, Video, VodStream], safe=True)
         self.base_url = "https://www.swiftstreamz.cc/SwiftStreamzv2.1/datav2.php"
-        self.user_agent = "okhttp/3.12.1"
+        self.user_agent = "Dalvik/2.1.0 (Linux; U; Android 9; AFTSSS Build/PS7223)"
         self.player_user_agent = "Lavf/56.15.102"
         self.s = requests.Session()
         retries = Retry(
@@ -118,20 +133,19 @@ class SwiftStream:
         self.s.mount("http://", retryable_adapter)
         self.s.cookies = LWPCookieJar(filename=COOKIE_FILE)
         if os.path.isfile(COOKIE_FILE):
-            self.s.cookies.load(ignore_discard=True, ignore_expires=True)
+            self.s.cookies.load()
 
     def __del__(self):
         db.close()
-        self.s.cookies.save(ignore_discard=True, ignore_expires=True)
+        self.s.cookies.save()
         self.s.close()
-
-    def image_url(self, img):
-        return "{0}|{1}".format(img, urlencode({"User-Agent": self.user_agent}))
 
     def get_post_data(self):
         data = {}
         _hash_int = str(randint(0, 900 - 1))
-        _hash_token = bytearray.fromhex("e5a688e4bda0e5a688e4bda0e5a688e4bb96e5a688e79a84e4bda0e5a790e5a790e79a84e6b7b7e89b8b")
+        _hash_token = bytearray.fromhex(
+            "e5a688e4bda0e5a688e4bda0e5a688e4bb96e5a688e79a84e4bda0e5a790e5a790e79a84e6b7b7e89b8b"
+        )
         _hash_int_bytes = bytearray(_hash_int, "utf-8")
         _hash = md5(_hash_token + _hash_int_bytes).hexdigest()
         data["data"] = _hash_int
@@ -147,7 +161,7 @@ class SwiftStream:
         else:
             req = requests.Request("GET", url, headers=headers, params=params)
         prepped = self.s.prepare_request(req)
-        del prepped.headers["User-Agent"]
+        del prepped.headers["Accept"]
         r = self.s.send(prepped, timeout=10, verify=False)
         r.raise_for_status()
         if r_json:
@@ -270,44 +284,52 @@ class SwiftStream:
                     Stream.replace_many(batch).execute()
 
     def get_categories(self):
+        categories = Category.select().order_by(Category.c_type)
+        if categories.count() == 0:
+            self.update_categories()
+        else:
+            current_time = int(time.time())
+            if current_time - int(categories[0].updated) > self.CACHE_TIME:
+                try:
+                    self.update_categories()
+                except (ValueError, RequestException):
+                    print("update_categories failed")
         return Category.select().order_by(Category.c_type)
 
-    def get_channels_by_category(self, c_id, cache_time=0):
+    def get_channels_by_category(self, c_id):
         channels = Channel.select().where(Channel.c_id == c_id)
         if channels.count() == 0:
             self.update_category_channels(c_id)
         else:
             current_time = int(time.time())
-            if current_time - int(channels[0].updated) > cache_time:
+            if current_time - int(channels[0].updated) > self.CACHE_TIME:
                 try:
                     self.update_category_channels(c_id)
                 except (ValueError, RequestException):
-                    pass
-        """ !! select cursor reset in sqlite after update commit """
+                    print("update_category_channels failed")
         return Channel.select().where(Channel.c_id == c_id)
 
-    def get_videos_by_category(self, c_id, cache_time=0):
+    def get_videos_by_category(self, c_id):
         videos = Video.select().where(Video.c_id == c_id)
         if videos.count() == 0:
             self.update_category_videos(c_id)
         else:
             current_time = int(time.time())
-            if current_time - int(videos[0].updated) > cache_time:
+            if current_time - int(videos[0].updated) > self.CACHE_TIME:
                 try:
                     self.update_category_videos(c_id)
                 except (ValueError, RequestException):
-                    pass
-        """ !! select cursor reset in sqlite after update commit """
+                    print("update_category_videos failed")
         return Video.select().where(Video.c_id == c_id)
 
-    def get_category(self, c_id, cache_time=0):
+    def get_category(self, c_id):
         cat = Category.get(Category.c_id == c_id)
         if cat.c_type == "live":
-            return self.get_channels_by_category(c_id, cache_time)
+            return self.get_channels_by_category(c_id)
         else:
-            return self.get_videos_by_category(c_id, cache_time)
+            return self.get_videos_by_category(c_id)
 
-    def get_channel_by_id(self, c_id, _id, cache_time=0):
+    def get_channel_by_id(self, c_id, _id):
         cat = Category.get(Category.c_id == c_id)
         if cat.c_type == "live":
             return Channel.get(Channel._id == _id)

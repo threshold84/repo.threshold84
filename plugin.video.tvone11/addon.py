@@ -22,8 +22,6 @@ from kodi_six import xbmc, xbmcgui, xbmcaddon, xbmcplugin
 from routing import Plugin
 
 import os
-import time
-import requests
 from requests.exceptions import RequestException
 from future.moves.urllib.parse import urlencode
 from resources.lib.swift import SwiftStream
@@ -32,15 +30,11 @@ try:
     from xbmcvfs import translatePath
 except ImportError:
     from kodi_six.xbmc import translatePath
-from warnings import simplefilter
 
-simplefilter("ignore")
 addon = xbmcaddon.Addon()
 plugin = Plugin()
 plugin.name = addon.getAddonInfo("name")
 USER_DATA_DIR = translatePath(addon.getAddonInfo("profile"))
-data_time = int(addon.getSetting("data_time") or "0")
-cache_time = int(addon.getSetting("cache_time") or "0") * 60 * 60
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
 
@@ -54,30 +48,15 @@ def xbmc_curl_encode(url):
 
 
 TV = SwiftStream(USER_DATA_DIR)
-current_time = int(time.time())
-if current_time - data_time > cache_time:
-    try:
-        TV.update_categories()
-        addon.setSetting("data_time", str(current_time))
-        log("[{0}] Categories updated".format(current_time))
-    except (ValueError, RequestException) as e:
-        if data_time == 0:
-            """ No data """
-            dialog = xbmcgui.Dialog()
-            dialog.notification(plugin.name, e.message, xbmcgui.NOTIFICATION_ERROR)
-            xbmcplugin.endOfDirectory(plugin.handle, False)
-        else:
-            """ Data update failed """
-            log("[{0}] Categories update fail, data age: {1}".format(current_time, data_time))
-            log(e.message)
 
 
 @plugin.route("/")
 def root():
     list_items = []
     for cat in TV.get_categories():
+        image = xbmc_curl_encode((cat.c_image, {"User-Agent": "okhttp/3.12.1"}))
         li = ListItem(cat.c_name, offscreen=True)
-        li.setArt({"thumb": cat.c_image, "icon": cat.c_image})
+        li.setArt({"thumb": image, "icon": image})
         url = plugin.url_for(list_channels, cat_id=cat.c_id)
         list_items.append((url, li, True))
     xbmcplugin.addDirectoryItems(plugin.handle, list_items)
@@ -88,9 +67,9 @@ def root():
 def list_channels(cat_id):
     list_items = []
     try:
-        for channel in TV.get_category(cat_id, cache_time):
+        for channel in TV.get_category(cat_id):
             title = channel.title
-            image = channel.thumbnail
+            image = xbmc_curl_encode((channel.thumbnail, {"User-Agent": "okhttp/3.12.1"}))
             li = ListItem(title, offscreen=True)
             li.setProperty("IsPlayable", "true")
             li.setArt({"thumb": image, "icon": image})
@@ -110,7 +89,7 @@ def list_channels(cat_id):
 
 @plugin.route("/play/<cat_id>/<channel_id>/play.pvr")
 def play(cat_id, channel_id):
-    channel = TV.get_channel_by_id(cat_id, channel_id, cache_time)
+    channel = TV.get_channel_by_id(cat_id, channel_id)
     try:
         if len(channel.streams) > 1:
             dialog = xbmcgui.Dialog()
@@ -120,16 +99,9 @@ def play(cat_id, channel_id):
             stream = channel.streams[0]
         media_url = TV.get_stream_link(stream)
 
-        """ follow https > http redirect """
-        r = requests.get(
-            media_url[0], headers=media_url[1], timeout=16, stream=True, allow_redirects=False, verify=False
-        )
-        r.raise_for_status()
-        if r.status_code == 302:
-            media_url = (r.headers["Location"], media_url[1])
-
+        image = xbmc_curl_encode((channel.thumbnail, {"User-Agent": "okhttp/3.12.1"}))
         li = ListItem(channel.title, path=xbmc_curl_encode(media_url))
-        li.setArt({"thumb": channel.thumbnail, "icon": channel.thumbnail})
+        li.setArt({"thumb": image, "icon": image})
         if "playlist.m3u8" in media_url[0]:
             li.setContentLookup(False)
             li.setMimeType("application/vnd.apple.mpegurl")

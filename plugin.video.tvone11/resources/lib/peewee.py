@@ -65,7 +65,7 @@ except ImportError:
         mysql = None
 
 
-__version__ = '3.13.1'
+__version__ = '3.14.0'
 __all__ = [
     'AsIs',
     'AutoField',
@@ -159,6 +159,7 @@ if sys.version_info[0] == 2:
     buffer_type = buffer
     izip_longest = itertools.izip_longest
     callable_ = callable
+    multi_types = (list, tuple, frozenset, set)
     exec('def reraise(tp, value, tb=None): raise tp, value, tb')
     def print_(s):
         sys.stdout.write(s)
@@ -176,6 +177,7 @@ else:
     buffer_type = memoryview
     basestring = str
     long = int
+    multi_types = (list, tuple, frozenset, set, range)
     print_ = getattr(builtins, 'print')
     izip_longest = itertools.zip_longest
     def reraise(tp, value, tb=None):
@@ -616,8 +618,6 @@ class Context(object):
     def value(self, value, converter=None, add_param=True):
         if converter:
             value = converter(value)
-            if isinstance(value, Node):
-                return self.sql(value)
         elif converter is None and self.state.converter:
             # Explicitly check for None so that "False" can be used to signify
             # that no conversion should be applied.
@@ -625,6 +625,13 @@ class Context(object):
 
         if isinstance(value, Node):
             with self(converter=None):
+                return self.sql(value)
+        elif is_model(value):
+            # Under certain circumstances, we could end-up treating a model-
+            # class itself as a value. This check ensures that we drop the
+            # table alias into the query instead of trying to parameterize a
+            # model (for instance, passing a model as a function argument).
+            with self.scope_column():
                 return self.sql(value)
 
         self._values.append(value)
@@ -814,10 +821,23 @@ class _HashableSource(object):
         return self._hash
 
     def __eq__(self, other):
-        return self._hash == other._hash
+        if isinstance(other, _HashableSource):
+            return self._hash == other._hash
+        return Expression(self, OP.EQ, other)
 
     def __ne__(self, other):
-        return not (self == other)
+        if isinstance(other, _HashableSource):
+            return self._hash != other._hash
+        return Expression(self, OP.NE, other)
+
+    def _e(op):
+        def inner(self, rhs):
+            return Expression(self, op, rhs)
+        return inner
+    __lt__ = _e(OP.LT)
+    __le__ = _e(OP.LTE)
+    __gt__ = _e(OP.GT)
+    __ge__ = _e(OP.GTE)
 
 
 def __bind_database__(meth):
@@ -1057,6 +1077,11 @@ class CTE(_HashableSource, Source):
         return CTE(self._alias, clone + rhs, self._recursive, self._columns)
     __add__ = union_all
 
+    def union(self, rhs):
+        clone = self._query.clone()
+        return CTE(self._alias, clone | rhs, self._recursive, self._columns)
+    __or__ = union
+
     def __sql__(self, ctx):
         if ctx.scope != SCOPE_CTE:
             return ctx.sql(Entity(self._alias))
@@ -1080,6 +1105,12 @@ class CTE(_HashableSource, Source):
 
 
 class ColumnBase(Node):
+    _converter = None
+
+    @Node.copy
+    def converter(self, converter=None):
+        self._converter = converter
+
     def alias(self, alias):
         if alias:
             return Alias(self, alias)
@@ -1154,24 +1185,30 @@ class ColumnBase(Node):
     def is_null(self, is_null=True):
         op = OP.IS if is_null else OP.IS_NOT
         return Expression(self, op, None)
+
+    def _escape_like_expr(self, s, template):
+        if s.find('_') >= 0 or s.find('%') >= 0 or s.find('\\') >= 0:
+            s = s.replace('\\', '\\\\').replace('_', '\\_').replace('%', '\\%')
+            return NodeList((template % s, SQL('ESCAPE'), '\\'))
+        return template % s
     def contains(self, rhs):
         if isinstance(rhs, Node):
             rhs = Expression('%', OP.CONCAT,
                              Expression(rhs, OP.CONCAT, '%'))
         else:
-            rhs = '%%%s%%' % rhs
+            rhs = self._escape_like_expr(rhs, '%%%s%%')
         return Expression(self, OP.ILIKE, rhs)
     def startswith(self, rhs):
         if isinstance(rhs, Node):
             rhs = Expression(rhs, OP.CONCAT, '%')
         else:
-            rhs = '%s%%' % rhs
+            rhs = self._escape_like_expr(rhs, '%s%%')
         return Expression(self, OP.ILIKE, rhs)
     def endswith(self, rhs):
         if isinstance(rhs, Node):
             rhs = Expression('%', OP.CONCAT, rhs)
         else:
-            rhs = '%%%s' % rhs
+            rhs = self._escape_like_expr(rhs, '%%%s')
         return Expression(self, OP.ILIKE, rhs)
     def between(self, lo, hi):
         return Expression(self, OP.BETWEEN, NodeList((lo, SQL('AND'), hi)))
@@ -1225,6 +1262,7 @@ class WrappedNode(ColumnBase):
     def __init__(self, node):
         self.node = node
         self._coerce = getattr(node, '_coerce', True)
+        self._converter = getattr(node, '_converter', None)
 
     def is_alias(self):
         return self.node.is_alias()
@@ -1316,12 +1354,10 @@ class BitwiseNegated(BitwiseMixin, WrappedNode):
 
 
 class Value(ColumnBase):
-    _multi_types = (list, tuple, frozenset, set)
-
     def __init__(self, value, converter=None, unpack=True):
         self.value = value
         self.converter = converter
-        self.multi = isinstance(self.value, self._multi_types) and unpack
+        self.multi = unpack and isinstance(self.value, multi_types)
         if self.multi:
             self.values = []
             for item in self.value:
@@ -1483,6 +1519,7 @@ class Function(ColumnBase):
         self.name = name
         self.arguments = arguments
         self._filter = None
+        self._order_by = None
         self._python_value = python_value
         if name and name.lower() in ('sum', 'count', 'cast'):
             self._coerce = False
@@ -1497,6 +1534,10 @@ class Function(ColumnBase):
     @Node.copy
     def filter(self, where=None):
         self._filter = where
+
+    @Node.copy
+    def order_by(self, *ordering):
+        self._order_by = ordering
 
     @Node.copy
     def python_value(self, func=None):
@@ -1520,11 +1561,21 @@ class Function(ColumnBase):
         if not len(self.arguments):
             ctx.literal('()')
         else:
+            args = self.arguments
+
+            # If this is an ordered aggregate, then we will modify the last
+            # argument to append the ORDER BY ... clause. We do this to avoid
+            # double-wrapping any expression args in parentheses, as NodeList
+            # has a special check (hack) in place to work around this.
+            if self._order_by:
+                args = list(args)
+                args[-1] = NodeList((args[-1], SQL('ORDER BY'),
+                                     CommaNodeList(self._order_by)))
+
             with ctx(in_function=True, function_arg_count=len(self.arguments)):
                 ctx.sql(EnclosedNodeList([
-                    (argument if isinstance(argument, Node)
-                     else Value(argument, False))
-                    for argument in self.arguments]))
+                    (arg if isinstance(arg, Node) else Value(arg, False))
+                    for arg in args]))
 
         if self._filter:
             ctx.literal(' FILTER (WHERE ').sql(self._filter).literal(')')
@@ -1695,10 +1746,12 @@ class NodeList(ColumnBase):
         self.nodes = nodes
         self.glue = glue
         self.parens = parens
-        if parens and len(self.nodes) == 1:
-            if isinstance(self.nodes[0], Expression):
-                # Hack to avoid double-parentheses.
-                self.nodes[0].flat = True
+        if parens and len(self.nodes) == 1 and \
+           isinstance(self.nodes[0], Expression) and \
+           not self.nodes[0].flat:
+            # Hack to avoid double-parentheses.
+            self.nodes = (self.nodes[0].clone(),)
+            self.nodes[0].flat = True
 
     def __sql__(self, ctx):
         n_nodes = len(self.nodes)
@@ -2027,7 +2080,8 @@ class Query(BaseQuery):
              .sql(CommaNodeList(self._order_by)))
         if self._limit is not None or (self._offset is not None and
                                        ctx.state.limit_max):
-            ctx.literal(' LIMIT ').sql(self._limit or ctx.state.limit_max)
+            limit = ctx.state.limit_max if self._limit is None else self._limit
+            ctx.literal(' LIMIT ').sql(limit)
         if self._offset is not None:
             ctx.literal(' OFFSET ').sql(self._offset)
         return ctx
@@ -2180,6 +2234,9 @@ class CompoundSelectQuery(SelectBase):
         if ctx.scope == SCOPE_COLUMN:
             return self.apply_column(ctx)
 
+        # Call parent method to handle any CTEs.
+        super(CompoundSelectQuery, self).__sql__(ctx)
+
         outer_parens = ctx.subquery or (ctx.scope == SCOPE_SOURCE)
         with ctx(parentheses=outer_parens):
             # Should the left-hand query be wrapped in parentheses?
@@ -2206,7 +2263,7 @@ class CompoundSelectQuery(SelectBase):
 class Select(SelectBase):
     def __init__(self, from_list=None, columns=None, group_by=None,
                  having=None, distinct=None, windows=None, for_update=None,
-                 for_update_of=None, nowait=None, **kwargs):
+                 for_update_of=None, nowait=None, lateral=None, **kwargs):
         super(Select, self).__init__(**kwargs)
         self._from_list = (list(from_list) if isinstance(from_list, tuple)
                            else from_list) or []
@@ -2217,6 +2274,7 @@ class Select(SelectBase):
         self._for_update = for_update  # XXX: consider reorganizing.
         self._for_update_of = for_update_of
         self._for_update_nowait = nowait
+        self._lateral = lateral
 
         self._distinct = self._simple_distinct = None
         if distinct:
@@ -2299,6 +2357,10 @@ class Select(SelectBase):
         self._for_update_of = of
         self._for_update_nowait = nowait
 
+    @Node.copy
+    def lateral(self, lateral=True):
+        self._lateral = lateral
+
     def _get_query_key(self):
         return self._alias
 
@@ -2308,6 +2370,9 @@ class Select(SelectBase):
     def __sql__(self, ctx):
         if ctx.scope == SCOPE_COLUMN:
             return self.apply_column(ctx)
+
+        if self._lateral and ctx.scope == SCOPE_SOURCE:
+            ctx.literal('LATERAL ')
 
         is_subquery = ctx.subquery
         state = {
@@ -2730,13 +2795,19 @@ class Index(Node):
                 index_name = Entity(self._name)
                 table_name = self._table
 
+            ctx.sql(index_name)
+            if self._using is not None and \
+               ctx.state.index_using_precedes_table:
+                ctx.literal(' USING %s' % self._using)  # MySQL style.
+
             (ctx
-             .sql(index_name)
              .literal(' ON ')
              .sql(table_name)
              .literal(' '))
-            if self._using is not None:
-                ctx.literal('USING %s ' % self._using)
+
+            if self._using is not None and not \
+               ctx.state.index_using_precedes_table:
+                ctx.literal('USING %s ' % self._using)  # Postgres/default.
 
             ctx.sql(EnclosedNodeList([
                 SQL(expr) if isinstance(expr, basestring) else expr
@@ -2781,7 +2852,7 @@ class ModelIndex(Index):
             raise ValueError('Unable to generate a name for the index, please '
                              'explicitly specify a name.')
 
-        clean_field_names = re.sub('[^\w]+', '', '_'.join(accum))
+        clean_field_names = re.sub(r'[^\w]+', '', '_'.join(accum))
         meta = model._meta
         prefix = meta.name if meta.legacy_table_names else meta.table_name
         return _truncate_constraint_name('_'.join((prefix, clean_field_names)))
@@ -2908,6 +2979,7 @@ class Database(_callable_context_manager):
     compound_select_parentheses = CSQ_PARENTHESES_NEVER
     for_update = False
     index_schema_prefix = False
+    index_using_precedes_table = False
     limit_max = None
     nulls_ordering = False
     returning_clause = False
@@ -2931,7 +3003,7 @@ class Database(_callable_context_manager):
         self.thread_safe = thread_safe
         if thread_safe:
             self._state = _ConnectionLocal()
-            self._lock = threading.Lock()
+            self._lock = threading.RLock()
         else:
             self._state = _ConnectionState()
             self._lock = _NoopLock()
@@ -3080,6 +3152,7 @@ class Database(_callable_context_manager):
             'conflict_update': self.conflict_update,
             'for_update': self.for_update,
             'index_schema_prefix': self.index_schema_prefix,
+            'index_using_precedes_table': self.index_using_precedes_table,
             'limit_max': self.limit_max,
             'nulls_ordering': self.nulls_ordering,
         }
@@ -3733,16 +3806,16 @@ class PostgresqlDatabase(Database):
         query = """
             SELECT
                 i.relname, idxs.indexdef, idx.indisunique,
-                array_to_string(array_agg(cols.attname), ',')
+                array_to_string(ARRAY(
+                    SELECT pg_get_indexdef(idx.indexrelid, k + 1, TRUE)
+                    FROM generate_subscripts(idx.indkey, 1) AS k
+                    ORDER BY k), ',')
             FROM pg_catalog.pg_class AS t
             INNER JOIN pg_catalog.pg_index AS idx ON t.oid = idx.indrelid
             INNER JOIN pg_catalog.pg_class AS i ON idx.indexrelid = i.oid
             INNER JOIN pg_catalog.pg_indexes AS idxs ON
                 (idxs.tablename = t.relname AND idxs.indexname = i.relname)
-            LEFT OUTER JOIN pg_catalog.pg_attribute AS cols ON
-                (cols.attrelid = t.oid AND cols.attnum = ANY(idx.indkey))
             WHERE t.relname = %s AND t.relkind = %s AND idxs.schemaname = %s
-            GROUP BY i.relname, idxs.indexdef, idx.indisunique
             ORDER BY idx.indisunique DESC, i.relname;"""
         cursor = self.execute_sql(query, (table, 'r', schema or 'public'))
         return [IndexMetadata(name, sql.rstrip(' ;'), columns.split(','),
@@ -3870,6 +3943,7 @@ class MySQLDatabase(Database):
     commit_select = True
     compound_select_parentheses = CSQ_PARENTHESES_UNNESTED
     for_update = True
+    index_using_precedes_table = True
     limit_max = 2 ** 64 - 1
     safe_create_index = False
     safe_drop_index = False
@@ -4375,7 +4449,12 @@ class ObjectIdAccessor(object):
 
     def __get__(self, instance, instance_type=None):
         if instance is not None:
-            return instance.__data__.get(self.field.name)
+            value = instance.__data__.get(self.field.name)
+            # Pull the object-id from the related object if it is not set.
+            if value is None and self.field.name in instance.__rel__:
+                rel_obj = instance.__rel__[self.field.name]
+                value = getattr(rel_obj, self.field.rel_field.name)
+            return value
         return self.field
 
     def __set__(self, instance, value):
@@ -4675,13 +4754,18 @@ class BitField(BitwiseMixin, BigIntegerField):
         else:
             self.__current_flag = value << 1
 
-        class FlagDescriptor(object):
+        class FlagDescriptor(ColumnBase):
             def __init__(self, field, value):
                 self._field = field
                 self._value = value
+                super(FlagDescriptor, self).__init__()
+            def clear(self):
+                return self._field.bin_and(~self._value)
+            def set(self):
+                return self._field.bin_or(self._value)
             def __get__(self, instance, instance_type=None):
                 if instance is None:
-                    return self._field.bin_and(self._value) != 0
+                    return self
                 value = getattr(instance, self._field.name) or 0
                 return (value & self._value) != 0
             def __set__(self, instance, is_set):
@@ -4693,6 +4777,8 @@ class BitField(BitwiseMixin, BigIntegerField):
                 else:
                     value &= ~self._value
                 setattr(instance, self._field.name, value)
+            def __sql__(self, ctx):
+                return ctx.sql(self._field.bin_and(self._value) != 0)
         return FlagDescriptor(self, value)
 
 
@@ -5111,7 +5197,7 @@ class ForeignKeyField(Field):
 
     def db_value(self, value):
         if isinstance(value, self.rel_model):
-            value = value.get_id()
+            value = getattr(value, self.rel_field.name)
         return self.rel_field.db_value(value)
 
     def python_value(self, value):
@@ -5375,11 +5461,21 @@ class CompositeKey(MetaField):
 
     def __init__(self, *field_names):
         self.field_names = field_names
+        self._safe_field_names = None
+
+    @property
+    def safe_field_names(self):
+        if self._safe_field_names is None:
+            if self.model is None:
+                return self.field_names
+
+            self._safe_field_names = [self.model._meta.fields[f].safe_name
+                                      for f in self.field_names]
+        return self._safe_field_names
 
     def __get__(self, instance, instance_type=None):
         if instance is not None:
-            return tuple([getattr(instance, field_name)
-                          for field_name in self.field_names])
+            return tuple([getattr(instance, f) for f in self.safe_field_names])
         return self
 
     def __set__(self, instance, value):
@@ -5760,7 +5856,7 @@ class Metadata(object):
 
     def make_table_name(self):
         if self.legacy_table_names:
-            return re.sub('[^\w]+', '_', self.name)
+            return re.sub(r'[^\w]+', '_', self.name)
         return make_snake_case(self.model.__name__)
 
     def model_graph(self, refs=True, backrefs=True, depth_first=True):
@@ -6118,6 +6214,9 @@ class ModelBase(type):
     def __bool__(self): return True
     __nonzero__ = __bool__  # Python 2.
 
+    def __sql__(self, ctx):
+        return ctx.sql(self._meta.table)
+
 
 class _BoundModelsContext(_callable_context_manager):
     def __init__(self, models, database, bind_refs, bind_backrefs):
@@ -6130,12 +6229,14 @@ class _BoundModelsContext(_callable_context_manager):
         self._orig_database = []
         for model in self.models:
             self._orig_database.append(model._meta.database)
-            model.bind(self.database, self.bind_refs, self.bind_backrefs)
+            model.bind(self.database, self.bind_refs, self.bind_backrefs,
+                       _exclude=set(self.models))
         return self.models
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         for model, db in zip(self.models, self._orig_database):
-            model.bind(db, self.bind_refs, self.bind_backrefs)
+            model.bind(db, self.bind_refs, self.bind_backrefs,
+                       _exclude=set(self.models))
 
 
 class Model(with_metaclass(ModelBase, Node)):
@@ -6182,8 +6283,10 @@ class Model(with_metaclass(ModelBase, Node)):
                     field = (key if isinstance(key, Field)
                              else cls._meta.combined[key])
                 except KeyError:
-                    raise ValueError('Unrecognized field name: "%s" in %s.' %
-                                     (key, data))
+                    if not isinstance(key, Node):
+                        raise ValueError('Unrecognized field name: "%s" in %s.'
+                                         % (key, data))
+                    field = key
                 normalized[field] = data[key]
         if kwargs:
             for key in kwargs:
@@ -6254,8 +6357,15 @@ class Model(with_metaclass(ModelBase, Node)):
             pk_fields = None
 
         fields = [cls._meta.fields[field_name] for field_name in field_names]
+        attrs = []
+        for field in fields:
+            if isinstance(field, ForeignKeyField):
+                attrs.append(field.object_id_name)
+            else:
+                attrs.append(field.name)
+
         for batch in batches:
-            accum = ([getattr(model, f) for f in field_names]
+            accum = ([getattr(model, f) for f in attrs]
                      for model in batch)
             res = cls.insert_many(accum, fields=fields).execute()
             if pk_fields and res is not None:
@@ -6282,6 +6392,8 @@ class Model(with_metaclass(ModelBase, Node)):
             batches = [model_list]
 
         n = 0
+        pk = cls._meta.primary_key
+
         for batch in batches:
             id_list = [model._pk for model in batch]
             update = {}
@@ -6291,8 +6403,8 @@ class Model(with_metaclass(ModelBase, Node)):
                     value = getattr(model, attr)
                     if not isinstance(value, Node):
                         value = field.to_value(value)
-                    accum.append((model._pk, value))
-                case = Case(cls._meta.primary_key, accum)
+                    accum.append((pk.to_value(model._pk), value))
+                case = Case(pk, accum)
                 update[field] = case
 
             n += (cls.update(update)
@@ -6409,7 +6521,7 @@ class Model(with_metaclass(ModelBase, Node)):
             pk_value = self._pk
         else:
             pk_field = pk_value = None
-        if only:
+        if only is not None:
             field_dict = self._prune_fields(field_dict, only)
         elif self._meta.only_save_dirty and not force_insert:
             field_dict = self._prune_fields(field_dict, self.dirty_fields)
@@ -6419,6 +6531,9 @@ class Model(with_metaclass(ModelBase, Node)):
 
         self._populate_unsaved_relations(field_dict)
         rows = 1
+
+        if self._meta.auto_increment and pk_value is None:
+            field_dict.pop(pk_field.name, None)
 
         if pk_value is not None and not force_insert:
             if self._meta.composite_key:
@@ -6496,13 +6611,17 @@ class Model(with_metaclass(ModelBase, Node)):
                              converter=self._meta.primary_key.db_value))
 
     @classmethod
-    def bind(cls, database, bind_refs=True, bind_backrefs=True):
+    def bind(cls, database, bind_refs=True, bind_backrefs=True, _exclude=None):
         is_different = cls._meta.database is not database
         cls._meta.set_database(database)
         if bind_refs or bind_backrefs:
+            if _exclude is None:
+                _exclude = set()
             G = cls._meta.model_graph(refs=bind_refs, backrefs=bind_backrefs)
             for _, model, is_backref in G:
-                model._meta.set_database(database)
+                if model not in _exclude:
+                    model._meta.set_database(database)
+                    _exclude.add(model)
         return is_different
 
     @classmethod
@@ -7026,11 +7145,16 @@ class ModelSelect(BaseModelSelect, Select):
 
     def filter(self, *args, **kwargs):
         # normalize args and kwargs into a new expression
-        dq_node = ColumnBase()
-        if args:
-            dq_node &= reduce(operator.and_, [a.clone() for a in args])
-        if kwargs:
-            dq_node &= DQ(**kwargs)
+        if args and kwargs:
+            dq_node = (reduce(operator.and_, [a.clone() for a in args]) &
+                       DQ(**kwargs))
+        elif args:
+            dq_node = (reduce(operator.and_, [a.clone() for a in args]) &
+                       ColumnBase())
+        elif kwargs:
+            dq_node = DQ(**kwargs) & ColumnBase()
+        else:
+            return self.clone()
 
         # dq_node should now be an Expression, lhs = Node(), rhs = ...
         q = collections.deque([dq_node])
@@ -7056,7 +7180,8 @@ class ModelSelect(BaseModelSelect, Select):
                 else:
                     q.append(piece)
 
-        dq_node = dq_node.rhs
+        if not args or not kwargs:
+            dq_node = dq_node.lhs
 
         query = self.clone()
         for field in dq_joins:
@@ -7259,6 +7384,8 @@ class BaseModelCursorWrapper(DictCursorWrapper):
                 fields[idx] = node
                 if not raw_node.is_alias():
                     self.columns[idx] = node.name
+            elif isinstance(node, ColumnBase) and raw_node._converter:
+                converters[idx] = raw_node._converter
             elif isinstance(node, Function) and node._coerce:
                 if node._python_value is not None:
                     converters[idx] = node._python_value
@@ -7496,6 +7623,7 @@ class PrefetchQuery(collections.namedtuple('_PrefetchQuery', (
                 rel_instances = id_map.get(key, [])
                 for inst in rel_instances:
                     setattr(inst, attname, instance)
+                    inst._dirty.clear()
                 setattr(instance, field.backref, rel_instances)
 
     def store_instance(self, instance, id_map):
