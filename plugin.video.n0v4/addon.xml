@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.n0v4" name="N0v4" version="3" provider-name="N0v4">
+<addon id="plugin.video.n0v4" name="N0v4" version="4" provider-name="N0v4">
   <requires>
-    <import addon="xbmc.python" version="2.26.0"/>
-    <import addon="script.module.tulip" version="2.6.17"/>
+    <import addon="xbmc.addon" version="16.1.000"/>
+    <import addon="script.module.tulip" version="2.8.6"/>
     <import addon="script.module.futures" version="2.2.0"/>
   </requires>
   <extension point="xbmc.python.pluginsource" library="addon.py">
