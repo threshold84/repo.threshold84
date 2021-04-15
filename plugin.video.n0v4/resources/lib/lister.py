@@ -13,7 +13,7 @@ def _get_content():
     result = []
     futures = []
 
-    html = client.request('https://www.dailyiptvlist.com/euro-free-m-3u-ip-tv/greece-greek/')
+    html = client.request('https://www.dailyiptvlist.com/iptv-europe-free-m-3-u/greece-greek/')
 
     latest = itertags_wrapper(html, 'a', {'class': 'image-link'}, 'href')[0]
 
